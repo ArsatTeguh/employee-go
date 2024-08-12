@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://glints.com/id/lowongan/wp-content/uploads/2020/11/Golang-700x395-1-e1604625132833.png" width="200" alt="Nest Logo" /></a>
 </p>
