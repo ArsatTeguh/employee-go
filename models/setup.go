@@ -1,11 +1,11 @@
 package models
 
 import (
+	"database/sql"
 	"os"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -18,9 +18,12 @@ func GetEnv(key, fallback string) string {
 }
 
 func ConnectionDb() {
-	database, err := gorm.Open(mysql.Open(GetEnv("MYSQL", "env MYSQL kosong")), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
-	})
+	sqlDB, _ := sql.Open("mysql", GetEnv("MYSQL", "env MYSQL kosong"))
+	database, err := gorm.Open(mysql.New(mysql.Config{
+		Conn: sqlDB,
+	}), &gorm.Config{})
+
+	// database, err := gorm.Open(mysql.Open(GetEnv("MYSQL", "env MYSQL kosong")))
 
 	if err != nil {
 		panic(err)
