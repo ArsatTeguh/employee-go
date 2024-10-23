@@ -45,15 +45,15 @@ func (a *AttedanceController) GetAll(ctx *gin.Context) {
 
 func (a *AttedanceController) GetOne(ctx *gin.Context) {
 	var attedance models.Attedance
-	param := ctx.Param("id")
+	param := ctx.Param("id") // employee id
 	id, _ := strconv.Atoi(param)
-	user, errs := helper.GetUser(ctx)
+	validate := helper.Premission(ctx)
 
-	if errs != nil {
+	if validate != nil {
 		return
 	}
 
-	if err := a.DB.Where("id = ? AND id_employee = ?", id, user.Id).Error; err != nil {
+	if err := a.DB.Where("employee_id = ?", id).Find(&attedance).Error; err != nil {
 		helper.ErrorServer(err, ctx)
 		return
 	}
@@ -149,11 +149,30 @@ func (a *AttedanceController) Update(ctx *gin.Context) { // attedances id body
 
 func (a *AttedanceController) chekinExist(ctx *gin.Context, chekout *models.Attedance, attId int64) (models.Attedance, error) {
 	var employee models.Employee
+	user, err := helper.GetUser(ctx)
+
+	if err != nil {
+		res := helper.WithoutData{
+			Code:    203,
+			Message: "No match users",
+		}
+		res.Response(ctx)
+		return *chekout, fmt.Errorf(err.Error())
+	}
 
 	if err := a.DB.Where("id = ? AND chekout IS NULL", attId).First(&chekout).Error; err != nil { // attedance_id
 		res := helper.WithoutData{
 			Code:    400,
 			Message: "Attedance tidak ditemukan atau user sudah checkout",
+		}
+		res.Response(ctx)
+		return *chekout, fmt.Errorf(err.Error())
+	}
+
+	if user.Id != chekout.EmployeeId {
+		res := helper.WithoutData{
+			Code:    400,
+			Message: "checkout dapat dilakukan dengan akun yang login saja",
 		}
 		res.Response(ctx)
 		return *chekout, fmt.Errorf(err.Error())

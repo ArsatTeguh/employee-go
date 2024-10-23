@@ -23,6 +23,7 @@ func SetupRouter(server *gin.Engine, databases *gorm.DB) *gin.Engine {
 	r := server.Group("api/v1")
 	r.POST("/auth/register", user.Register)
 	r.POST("/auth/login", user.Login)
+	r.GET("/auth/token", user.RefreshToken)
 
 	// Private API
 	protected := server.Group("api/v1")

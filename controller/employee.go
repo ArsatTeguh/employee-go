@@ -218,10 +218,16 @@ func (e *employeeController) Delete(ctx *gin.Context) {
 	}
 
 	var employee models.Employee
+	var user models.User
 	param := ctx.Param("id")
 	id, _ := strconv.Atoi(param)
 
 	if err := e.DB.Delete(&employee, id).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	if err := e.DB.Delete(&user, employee.Id).Error; err != nil {
 		helper.ErrorServer(err, ctx)
 		return
 	}

@@ -4,10 +4,12 @@ import (
 	"backend/dto"
 	"backend/helper"
 	"backend/models"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -22,6 +24,7 @@ type userServcie interface {
 	Logout(ctx *gin.Context)
 	GetOneUser(ctx *gin.Context)
 	GetAll(ctx *gin.Context)
+	RefreshToken(ctx *gin.Context)
 }
 
 func NewUserService(db *gorm.DB) userServcie {
@@ -179,16 +182,30 @@ func (u *User) Login(ctx *gin.Context) {
 
 	token, err := helper.CreateToken(user.Email, user.Id, *user.Role)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Terjadi kesalahan"})
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Terjadi kesalahan di accesstoken"})
+		return
+	}
+
+	refreshToken, err := helper.CreateRefreshToken(user.Email, user.Id, *user.Role)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Terjadi kesalahan di refreshtoken"})
+		return
+	}
+
+	user.Tokenize = &refreshToken // update value refresh token
+
+	if updateRefreshToken := u.DB.Updates(&user).Error; updateRefreshToken != nil {
+		helper.ErrorServer(updateRefreshToken, ctx)
 		return
 	}
 
 	http.SetCookie(ctx.Writer, &http.Cookie{
-		Name:     "token",
-		Value:    token,
+		Name:     "refreshToken",
+		Value:    refreshToken,
 		Expires:  time.Now().Add(24 * time.Hour), // Set expires to 1 day in the future
 		HttpOnly: true,
 		Path:     "/",
+		// Secure: true,
 	})
 
 	response := &helper.WithData{
@@ -201,25 +218,29 @@ func (u *User) Login(ctx *gin.Context) {
 }
 
 func (u *User) Logout(ctx *gin.Context) {
-	user, err := helper.GetUser(ctx)
+	var personalUser models.User
+	refreshToken := helper.ExtractToken(ctx)
 
-	if err != nil {
-		return
-	}
-
-	if err := u.DB.Where("id = ?", user.Id).First(&models.User{}).Error; err != nil {
-		helper.ErrorServer(err, ctx)
+	if err := u.DB.First(&personalUser, "tokenize = ?", refreshToken).Error; err != nil {
+		ctx.AbortWithError(403, err)
 		return
 	}
 
 	http.SetCookie(ctx.Writer, &http.Cookie{
-		Name:     "token",
+		Name:     "refreshToken",
 		Value:    "",
 		Expires:  time.Unix(0, 0), // Set expires to the past
+		MaxAge:   -1,
 		HttpOnly: true,
 		Path:     "/",
 	})
 
+	personalUser.Tokenize = nil
+	if updateRefreshToken := u.DB.Select("Tokenize").Updates(&personalUser).Error; updateRefreshToken != nil {
+		helper.ErrorServer(updateRefreshToken, ctx)
+		return
+	}
+	fmt.Printf("tokenize berhasil di hapus")
 	response := &helper.WithoutData{
 		Code:    200,
 		Message: "Berhasil Log out",
@@ -247,6 +268,60 @@ func (u *User) GetAll(ctx *gin.Context) {
 		Code:    200,
 		Message: "success",
 		Data:    user,
+	}
+
+	response.Response(ctx)
+}
+
+var SecreetRefreshToken = models.GetEnv("SECREETREFRESHTOKEN", "SECREET TIDAK DITEMUKAN")
+
+func (u *User) RefreshToken(ctx *gin.Context) {
+	var user models.User
+	var customeclaims helper.MyCustomClaims
+	refreshToken, err := ctx.Request.Cookie("refreshToken")
+	fmt.Printf("1")
+
+	if err != nil {
+		ctx.JSON(401, gin.H{"message": "token tidak ada dalam cookie"})
+		return
+	}
+	fmt.Printf("2")
+	if err := u.DB.First(&user, "tokenize = ?", refreshToken.Value).Error; err != nil {
+		ctx.JSON(401, gin.H{"message": "refresh token  tidak ditemukan"})
+		return
+	}
+
+	token, err := jwt.ParseWithClaims(
+		refreshToken.Value,
+		&customeclaims,
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(SecreetRefreshToken), nil // Compare with the secret
+		},
+	)
+
+	if err != nil {
+		ctx.JSON(403, gin.H{"message": "token no match"})
+		return
+	}
+
+	_, ok := token.Claims.(*helper.MyCustomClaims)
+
+	if !ok || !token.Valid {
+		ctx.JSON(403, gin.H{"message": "token no claims"})
+		return
+	}
+
+	newToken, err := helper.CreateToken(user.Email, user.Id, *user.Role)
+
+	if err != nil {
+		ctx.AbortWithError(500, err)
+		return
+	}
+
+	response := &helper.WithData{
+		Code:    200,
+		Message: "success",
+		Data:    newToken,
 	}
 
 	response.Response(ctx)

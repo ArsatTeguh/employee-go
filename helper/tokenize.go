@@ -3,6 +3,7 @@ package helper
 import (
 	"backend/models"
 	"fmt"
+	"strings"
 
 	"time"
 
@@ -10,7 +11,8 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-var Secreet = models.GetEnv("SECREET", "SECREET TIDAK DITEMUKAN")
+var SecreetAccessToken = models.GetEnv("SECREET", "SECREET TIDAK DITEMUKAN")
+var SecreetRefreshToken = models.GetEnv("SECREETREFRESHTOKEN", "SECREET TIDAK DITEMUKAN")
 
 type MyCustomClaims struct {
 	Id    int64  `json:"id"`
@@ -34,23 +36,43 @@ func CreateToken(email string, id int64, role string) (string, error) {
 		email,
 		role,
 		jwt.RegisteredClaims{
+			// ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Second)),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(Secreet))
+	return token.SignedString([]byte(SecreetAccessToken))
+}
+
+func CreateRefreshToken(email string, id int64, role string) (string, error) {
+	claims := MyCustomClaims{
+		id,
+		email,
+		role,
+		jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+		},
+	}
+	refresToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return refresToken.SignedString([]byte(SecreetRefreshToken))
 }
 
 func ExtractToken(c *gin.Context) string {
-	cookie, err := c.Request.Cookie("token")
-	if err != nil {
-		c.JSON(400, gin.H{"message": "token tidak ada dalam cookie"})
+	token := c.Request.Header.Get("Authorization")
+	if token == "" {
+		c.JSON(400, gin.H{"message": "token tidak ada dalam header"})
 		return ""
 	}
 
-	return cookie.Value
+	if strings.HasPrefix(token, "Bearer ") {
+		return strings.TrimPrefix(token, "Bearer ")
+	}
+
+	return token
 }
 
 func TokenValid(c *gin.Context) (JWTResponse, error) {
@@ -60,12 +82,12 @@ func TokenValid(c *gin.Context) (JWTResponse, error) {
 		tokenString,
 		&MyCustomClaims{},
 		func(token *jwt.Token) (interface{}, error) {
-			return []byte(Secreet), nil
+			return []byte(SecreetAccessToken), nil
 		},
 	)
 
 	if err != nil {
-		return j, fmt.Errorf("Unauthentication1")
+		return j, fmt.Errorf("Token expired")
 	}
 
 	claims, ok := token.Claims.(*MyCustomClaims)
@@ -73,6 +95,7 @@ func TokenValid(c *gin.Context) (JWTResponse, error) {
 	if !ok || !token.Valid {
 		return j, fmt.Errorf("Unauthentication2")
 	}
+
 	claim := JWTResponse{
 		Id:    claims.Id,
 		Email: claims.Email,
