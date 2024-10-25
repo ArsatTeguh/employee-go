@@ -36,8 +36,8 @@ func CreateToken(email string, id int64, role string) (string, error) {
 		email,
 		role,
 		jwt.RegisteredClaims{
-			// ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Second)),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Second)),
+			// ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
