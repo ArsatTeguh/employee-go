@@ -1,6 +1,7 @@
 package main
 
 import (
+	"backend/helper"
 	"backend/models"
 	"backend/routers"
 	"log"
@@ -24,6 +25,7 @@ func main() {
 	server.Static("/assets", "./assets")
 	server.MaxMultipartMemory = 1024 * 1024 * 1 // 1MB
 	databases := models.DB
+	server.Use(helper.CORSMiddleware())
 
 	r := routers.SetupRouter(server, databases)
 	r.Run()

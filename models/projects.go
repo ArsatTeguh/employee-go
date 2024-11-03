@@ -7,7 +7,7 @@ type Project struct {
 	Name       string     `json:"name" gorm:"size:50;"`
 	Estimation string     `json:"Estimation" gorm:"size:50;"`
 	Status     string     `json:"status" gorm:"size:50;"`
-	Position   []Position `json:"-" gorm:"foreignKey:ProjectId"`
+	Position   []Position `json:"position" gorm:"foreignKey:ProjectId"`
 	CreatedAt  time.Time  `json:"created_at"`
 	UpdatedAt  time.Time  `json:"updated_at"`
 }

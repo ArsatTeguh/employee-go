@@ -17,8 +17,8 @@ type ProjectController struct {
 
 func (p *ProjectController) GetAllProject(ctx *gin.Context) {
 	var project []models.Project
-
-	if err := p.DB.Find(&project).Error; err != nil {
+	query := p.DB.Model(&project).Preload("Position")
+	if err := query.Find(&project).Error; err != nil {
 		helper.ErrorServer(err, ctx)
 		return
 	}
@@ -137,6 +137,12 @@ func (p *ProjectController) Delete(ctx *gin.Context) {
 		return
 	}
 
+	// Update foreign key to nullify the dependency
+	if err := p.DB.Model(&models.Position{}).Where("project_id = ?", id).Update("project_id", nil).Error; err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
 	if err := p.DB.Delete(&project, id).Error; err != nil {
 		helper.ErrorServer(err, ctx)
 		return
@@ -146,5 +152,69 @@ func (p *ProjectController) Delete(ctx *gin.Context) {
 		Code:    200,
 		Message: "Delete Success",
 	}
+	res.Response(ctx)
+}
+
+type ProjectMasterResponse struct {
+	Projects     []models.Project  `json:"projects"`
+	StatusCounts []StatusCount     `json:"status_counts"`
+	Employee     []TypeNewEmployee `json:"employee"`
+}
+
+type StatusCount struct {
+	Status     string `json:"status"`
+	TotalCount int    `json:"total_count"`
+}
+
+type TypeNewEmployee struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"`
+	Picture string `json:"picture"`
+}
+
+func (p *ProjectController) ProjectMaster(ctx *gin.Context) {
+	valid := helper.Premission(ctx)
+	if valid != nil {
+		return
+	}
+
+	var projects []models.Project
+	var statusCounts []StatusCount
+	var employees []TypeNewEmployee
+
+	// Fetch latest projects
+	if err := p.DB.Model(&projects).
+		Preload("Position").
+		Order("created_at desc").
+		Limit(3).
+		Find(&projects).Error; err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		// jika terjadi error lanjutkan saja
+	}
+
+	// Fetch status counts
+	if err := p.DB.Table("projects"). // Adjust table name
+						Select("status, COUNT(*) as total_count").
+						Group("status").
+						Find(&statusCounts).Error; err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		// jika terjadi error lanjutkan saja
+	}
+
+	if err := p.DB.Table("employees").Select("name", "status", "picture").Find(&employees).Error; err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
+	}
+
+	// Combine results
+	res := &helper.WithData{
+		Code:    200,
+		Message: "Success Get Projects",
+		Data: ProjectMasterResponse{
+			Projects:     projects,
+			StatusCounts: statusCounts,
+			Employee:     employees,
+		},
+	}
+
 	res.Response(ctx)
 }

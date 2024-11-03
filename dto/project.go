@@ -6,9 +6,9 @@ import (
 )
 
 type RequestProject struct {
-	Name       string     `json:"name" binding:"required"`
-	Estimation string     `json:"estimation" binding:"required"`
-	Status     string     `json:"status" binding:"required"`
+	Name       string     `json:"name" validate:"required"`
+	Estimation string     `json:"estimation" validate:"required"`
+	Status     string     `json:"status" validate:"required"`
 	UpdatedAt  *time.Time `json:"updated_at"`
 }
 

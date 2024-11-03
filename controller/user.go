@@ -4,7 +4,6 @@ import (
 	"backend/dto"
 	"backend/helper"
 	"backend/models"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -202,10 +201,11 @@ func (u *User) Login(ctx *gin.Context) {
 	http.SetCookie(ctx.Writer, &http.Cookie{
 		Name:     "refreshToken",
 		Value:    refreshToken,
-		Expires:  time.Now().Add(24 * time.Hour), // Set expires to 1 day in the future
+		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
 		Path:     "/",
-		// Secure: true,
+		Secure:   false, // Set to true when using HTTPS in production
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	response := &helper.WithData{
@@ -219,28 +219,27 @@ func (u *User) Login(ctx *gin.Context) {
 
 func (u *User) Logout(ctx *gin.Context) {
 	var personalUser models.User
-	refreshToken := helper.ExtractToken(ctx)
+	refreshToken, err := ctx.Cookie("refreshToken")
+
+	if err != nil {
+		ctx.JSON(402, gin.H{"message": "token tidak ada dalam cookie"})
+		return
+	}
 
 	if err := u.DB.First(&personalUser, "tokenize = ?", refreshToken).Error; err != nil {
 		ctx.AbortWithError(403, err)
 		return
 	}
 
-	http.SetCookie(ctx.Writer, &http.Cookie{
-		Name:     "refreshToken",
-		Value:    "",
-		Expires:  time.Unix(0, 0), // Set expires to the past
-		MaxAge:   -1,
-		HttpOnly: true,
-		Path:     "/",
-	})
+	ctx.SetCookie("refreshToken", "", -1, "", "localhost", false, true)
 
 	personalUser.Tokenize = nil
+
 	if updateRefreshToken := u.DB.Select("Tokenize").Updates(&personalUser).Error; updateRefreshToken != nil {
 		helper.ErrorServer(updateRefreshToken, ctx)
 		return
 	}
-	fmt.Printf("tokenize berhasil di hapus")
+
 	response := &helper.WithoutData{
 		Code:    200,
 		Message: "Berhasil Log out",
@@ -278,21 +277,21 @@ var SecreetRefreshToken = models.GetEnv("SECREETREFRESHTOKEN", "SECREET TIDAK DI
 func (u *User) RefreshToken(ctx *gin.Context) {
 	var user models.User
 	var customeclaims helper.MyCustomClaims
-	refreshToken, err := ctx.Request.Cookie("refreshToken")
-	fmt.Printf("1")
+
+	refreshToken, err := ctx.Cookie("refreshToken")
 
 	if err != nil {
-		ctx.JSON(401, gin.H{"message": "token tidak ada dalam cookie"})
+		ctx.JSON(402, gin.H{"message": "token tidak ada dalam cookie"})
 		return
 	}
-	fmt.Printf("2")
-	if err := u.DB.First(&user, "tokenize = ?", refreshToken.Value).Error; err != nil {
-		ctx.JSON(401, gin.H{"message": "refresh token  tidak ditemukan"})
+
+	if err := u.DB.First(&user, "tokenize = ?", refreshToken).Error; err != nil {
+		ctx.JSON(402, gin.H{"message": "refresh token  tidak ditemukan"})
 		return
 	}
 
 	token, err := jwt.ParseWithClaims(
-		refreshToken.Value,
+		refreshToken,
 		&customeclaims,
 		func(token *jwt.Token) (interface{}, error) {
 			return []byte(SecreetRefreshToken), nil // Compare with the secret
@@ -300,7 +299,12 @@ func (u *User) RefreshToken(ctx *gin.Context) {
 	)
 
 	if err != nil {
-		ctx.JSON(403, gin.H{"message": "token no match"})
+		user.Tokenize = nil
+		if updateRefreshToken := u.DB.Select("Tokenize").Updates(&user).Error; updateRefreshToken != nil {
+			helper.ErrorServer(updateRefreshToken, ctx)
+			return
+		}
+		ctx.JSON(403, gin.H{"message": "Refresh Token expired"})
 		return
 	}
 

@@ -6,10 +6,10 @@ import (
 )
 
 type RequestPosition struct {
-	Position   string `json:"position" binding:"required"`
-	Status     string `json:"status" binding:"required"`
-	EmployeeId int64  `json:"employee_id" binding:"required"`
-	ProjectId  int64  `json:"project_id" binding:"required"`
+	Position   string `json:"position" validate:"required"`
+	Status     string `json:"status" validate:"required"`
+	EmployeeId int64  `json:"employee_id" validate:"required"`
+	ProjectId  int64  `json:"project_id" validate:"required"`
 }
 
 func (c RequestPosition) SavePosition() models.Position {
@@ -23,10 +23,10 @@ func (c RequestPosition) SavePosition() models.Position {
 }
 
 type RequestPositioUpdate struct {
-	Position   string     `json:"position" binding:"required"`
-	Status     string     `json:"status" binding:"required"`
-	EmployeeId int64      `json:"employee_id" binding:"required"`
-	ProjectId  int64      `json:"project_id" binding:"required"`
+	Position   string     `json:"position" validate:"required"`
+	Status     string     `json:"status" validate:"required"`
+	EmployeeId int64      `json:"employee_id" validate:"required"`
+	ProjectId  int64      `json:"project_id" validate:"required"`
 	UpdatedAt  *time.Time `json:"updated_at,omitempty"`
 }
 

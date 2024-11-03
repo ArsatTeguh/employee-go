@@ -51,6 +51,7 @@ func SetupRouter(server *gin.Engine, databases *gorm.DB) *gin.Engine {
 	protected.POST("/project", project.Saved)
 	protected.PATCH("/project/:id", project.Update)
 	protected.DELETE("/project/:id", project.Delete)
+	protected.GET("/project-master", project.ProjectMaster)
 
 	protected.GET("/attedances", attedance.GetAll)
 	protected.GET("/attedance/:id", attedance.GetOne)

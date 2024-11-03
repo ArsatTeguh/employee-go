@@ -67,23 +67,28 @@ func (p *PositionContoroller) SavePosition(ctx *gin.Context) {
 		return
 	}
 
-	var req dto.RequestPosition
+	var req []dto.RequestPosition
 
 	if err := dto.ValidationPayload(&req, ctx); err != nil {
 		return
 	}
 
-	position := req.SavePosition()
+	// Save positions to the database
+	// Map the request positions to models
+	positions := make([]models.Position, len(req))
+	for i, r := range req {
+		positions[i] = r.SavePosition()
+	} // Bulk create positions if err := p.DB.Create(&positions).Error; err != nil { ctx.JSON(500, gin.H{"error": err.Error()}) return }
 
-	if err := p.DB.Create(&position).Error; err != nil {
-		helper.ErrorServer(err, ctx)
+	// Bulk create positions
+	if err := p.DB.Create(&positions).Error; err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
-	res := &helper.WithData{
+	res := &helper.WithoutData{
 		Code:    201,
 		Message: "Success save data",
-		Data:    position,
 	}
 	res.Response(ctx)
 }
