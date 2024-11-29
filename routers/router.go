@@ -18,6 +18,8 @@ func SetupRouter(server *gin.Engine, databases *gorm.DB) *gin.Engine {
 	attedance := controller.AttedanceController{DB: databases}
 	payroll := controller.PayrollController{DB: databases}
 	leave := controller.LeaveController{DB: databases}
+	task := controller.TaskController{DB: databases}
+	wallet := controller.WalletContoroller{DB: databases}
 
 	// Public API
 	r := server.Group("api/v1")
@@ -36,15 +38,18 @@ func SetupRouter(server *gin.Engine, databases *gorm.DB) *gin.Engine {
 	protected.GET("/employees", employee.GetAllEmployee)
 	protected.GET("/employee-one", employee.GetOneEmployee)
 	protected.POST("/employee", employee.SaveEmployee)
-	protected.POST("/upload", employee.UploadProfile)
+	protected.PATCH("/upload", employee.UploadProfile)
 	protected.PATCH("/employee", employee.Update)
 	protected.DELETE("/employee", employee.Delete)
+	protected.GET("/profile/:id", employee.GetProfile)
 
 	protected.GET("/positions", position.GetAllPosition)
 	protected.GET("/position/:id", position.GetOnePosition)
+	protected.POST("/positionAllById", position.GetAllPositionById)
 	protected.POST("/position", position.SavePosition)
 	protected.GET("/position-project", position.GetByProject)
-	protected.PATCH("/position/:id", position.Update)
+	// protected.PATCH("/position/:id", position.Update)
+	protected.PATCH("/positions", position.SyncPositions)
 
 	protected.GET("/projects", project.GetAllProject)
 	protected.GET("/project/:id", project.GetOne)
@@ -61,12 +66,21 @@ func SetupRouter(server *gin.Engine, databases *gorm.DB) *gin.Engine {
 
 	protected.GET("/payrolls", payroll.GetAll)
 	protected.POST("/payroll", payroll.Payroll)
+	protected.POST("/payroll-email", payroll.EmailPayslip)
 
 	protected.GET("/leaves", leave.GetAll)
 	protected.GET("/leaves-employee", leave.GetAllByEmployee)
 	protected.GET("/leave-employee", leave.GetOneByEmployee)
 	protected.POST("/leave/:id", leave.Created)
 	protected.PATCH("/leave/:id", leave.Approve)
+
+	protected.PATCH("/task/:id", task.Update)
+	protected.GET("/task/:projectId", task.GetOne)
+	protected.POST("/task", task.SaveTask)
+	protected.DELETE("/task/:id", task.Delete)
+
+	protected.GET("/wallet/:id", wallet.GetOneWallet)
+	protected.PATCH("/wallet/:id", wallet.UpdatedWallet)
 
 	return server
 }

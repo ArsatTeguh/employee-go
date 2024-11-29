@@ -4,6 +4,7 @@ import (
 	"backend/dto"
 	"backend/helper"
 	"backend/models"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -22,7 +23,7 @@ func (p *PositionContoroller) GetAllPosition(ctx *gin.Context) {
 
 	var pst []models.Position
 
-	if err := p.DB.Preload("Attedance").Find(&pst).Error; err != nil {
+	if err := p.DB.Find(&pst).Error; err != nil {
 		helper.ErrorServer(err, ctx)
 		return
 	}
@@ -30,6 +31,45 @@ func (p *PositionContoroller) GetAllPosition(ctx *gin.Context) {
 	res := &helper.WithData{
 		Code:    200,
 		Message: "Success get all positions",
+		Data:    pst,
+	}
+
+	res.Response(ctx)
+
+}
+
+type PayloadPositionById struct {
+	Employee_id int64 `json:"employee_id" validate:"required"`
+}
+
+func (p *PositionContoroller) GetAllPositionById(ctx *gin.Context) {
+	if valid := helper.Premission(ctx); valid != nil {
+		return
+	}
+	var payload PayloadPositionById
+	var pst []models.Position
+
+	if err := dto.ValidationPayload(&payload, ctx); err != nil {
+		return
+	}
+
+	if err := p.DB.Preload("Project").Where("employee_id = ?", payload.Employee_id).Find(&pst).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	if len(pst) == 0 {
+		res := &helper.WithoutData{
+			Code:    400,
+			Message: "Data empty",
+		}
+		res.Response(ctx)
+		return
+	}
+
+	res := &helper.WithData{
+		Code:    200,
+		Message: "Success get all positions By Id",
 		Data:    pst,
 	}
 
@@ -45,7 +85,7 @@ func (p *PositionContoroller) GetOnePosition(ctx *gin.Context) {
 	var pst models.Position
 	id := ctx.Param("id")
 	i, _ := strconv.ParseInt(id, 10, 64)
-	query := p.DB.Model(&pst).Preload("Attedance")
+	query := p.DB.Model(&pst)
 
 	if err := query.Where("id = ?", i).First(&pst).Error; err != nil {
 		helper.ErrorServer(err, ctx)
@@ -165,6 +205,54 @@ func (p *PositionContoroller) Update(ctx *gin.Context) {
 		Code:    200,
 		Message: "Update",
 		Data:    position,
+	}
+	res.Response(ctx)
+}
+
+func (p *PositionContoroller) SyncPositions(ctx *gin.Context) {
+	if valid := helper.Premission(ctx); valid != nil {
+		return
+	}
+
+	var req []dto.RequestPosition
+	var modelPosition models.Position
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(400, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	// Ambil semua ID dari request
+	var ids int64
+
+	positions := make([]models.Position, len(req))
+	for i, pos := range req {
+		positions[i] = models.Position{
+			Position:   pos.Position,
+			Status:     pos.Status,
+			EmployeeId: pos.EmployeeId,
+			ProjectId:  pos.ProjectId,
+		}
+		ids = pos.ProjectId
+	}
+
+	// Hapus posisi
+	if err := p.DB.Model(&modelPosition).Where("project_id = ?", ids).Delete(&modelPosition).Error; err != nil {
+		fmt.Println("1", ids)
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Perbarui atau tambahkan posisi dari request
+	for _, pos := range positions {
+		if err := p.DB.Model(&modelPosition).Create(&pos).Error; err != nil {
+			ctx.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	res := &helper.WithoutData{
+		Code:    200,
+		Message: "Successfully synced positions",
 	}
 	res.Response(ctx)
 }

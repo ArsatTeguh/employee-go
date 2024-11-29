@@ -14,11 +14,26 @@ type CreatePayload struct {
 	TypeBanking   string  `json:"type_banking" validate:"required"`
 }
 
+type UpdateEmployeeStruct struct {
+	Name    string `json:"name"`
+	Address string `json:"address"`
+	Phone   int    `json:"phone"`
+}
+
 func (c *CreatePayload) PayloadEmployee() models.Employee {
 
 	return models.Employee{
 		Phone:   c.Phone,
 		Picture: c.Picture,
+	}
+}
+
+func (c *UpdateEmployeeStruct) UpdateEmployee() models.Employee {
+
+	return models.Employee{
+		Phone:   c.Phone,
+		Address: c.Address,
+		Name:    c.Name,
 	}
 }
 

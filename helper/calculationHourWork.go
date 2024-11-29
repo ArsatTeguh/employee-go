@@ -22,13 +22,11 @@ func CalculationWorkHour(chekin, checkout time.Time) float64 {
 	return result
 }
 
-func CalculationWorkMonthly(attedances []models.Attedance, employee_id int64) float64 {
+func CalculationWorkMonthly(attedances []models.Attedance) float64 {
 	var totalDuration time.Duration
 
 	for _, attedance := range attedances {
-		if attedance.EmployeeId == employee_id {
-			totalDuration += attedance.Chekout.Sub(*attedance.Chekin)
-		}
+		totalDuration += attedance.Chekout.Sub(*attedance.Chekin)
 	}
 
 	minute := int(totalDuration.Minutes()) % 60

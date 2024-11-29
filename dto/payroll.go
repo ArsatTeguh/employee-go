@@ -3,6 +3,7 @@ package dto
 import (
 	"backend/helper"
 	"backend/models"
+	"math"
 )
 
 type RequestPayroll struct {
@@ -11,6 +12,7 @@ type RequestPayroll struct {
 	Bonus      *float64 `json:"bonus"`
 	Tax        *float64 `json:"tax"`
 	Status     string   `json:"status" binding:"required"`
+	Date       string   `json:"date" binding:"required"`
 }
 
 func (c RequestPayroll) CalculationPayroll(salary_monthly float64, position []models.Attedance) models.Payroll {
@@ -32,11 +34,14 @@ func (c RequestPayroll) CalculationPayroll(salary_monthly float64, position []mo
 	tax_decimal := *c.Tax / 100                                    // convert pajak ke decimal
 	tax := (salary_monthly + *c.Bonus - subtraction) * tax_decimal // hitung pajak berdasarkan jumlah salary
 	total := (salary_monthly + *c.Bonus - subtraction) - tax
-	total_hourse := helper.CalculationWorkMonthly(position, c.EmployeeId)
+	total_hourse := helper.CalculationWorkMonthly(position)
+
+	// or
+	// amount, err := currency.CreateAmount("1234.59", "IRR")
 
 	return models.Payroll{
 		EmployeeId:  c.EmployeeId,
-		DailySalary: salary_day,
+		DailySalary: math.Ceil(salary_day*100) / 100,
 		Absence:     *c.Absen,
 		Bonus:       *c.Bonus,
 		Tax:         *c.Tax,

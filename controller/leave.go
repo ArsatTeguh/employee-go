@@ -6,6 +6,7 @@ import (
 	"backend/models"
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -20,17 +21,47 @@ func (l *LeaveController) GetAll(ctx *gin.Context) {
 	if err != nil {
 		return
 	}
-	var leave models.Leave
 
-	if err := l.DB.First(&leave).Error; err != nil {
-		helper.ErrorServer(err, ctx)
+	var leave []models.Leave
+	search := ctx.Query("status")
+
+	var totalCount int64
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1")) // convert string ke int
+	sizePage, _ := strconv.Atoi(ctx.DefaultQuery("sizePage", "5"))
+
+	offset := (page - 1) * sizePage
+	query := l.DB.Model(&leave).Preload("Employee", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "name")
+	})
+
+	if search != "" {
+		emailPattern := "%" + strings.ToLower(search) + "%"
+		query = query.Where("status LIKE ?", emailPattern)
+	}
+
+	query.Count(&totalCount)
+	query.Offset(offset).Limit(sizePage).Find(&leave)
+
+	if len(leave) == 0 {
+		response := &helper.WithoutData{
+			Code:    400,
+			Message: "Data kosong",
+		}
+		response.Response(ctx)
 		return
 	}
 
 	response := &helper.WithData{
 		Code:    200,
 		Message: "Success Get All Leaving",
-		Data:    leave,
+		Data: map[string]any{
+			"leave":      leave,
+			"total":      len(leave),
+			"totalAll":   totalCount,
+			"page":       page,
+			"sizePage":   sizePage,
+			"totalPages": (totalCount + int64(sizePage) - 1) / int64(sizePage),
+		},
 	}
 	response.Response(ctx)
 }

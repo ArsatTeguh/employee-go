@@ -16,7 +16,6 @@ func ValidationPayload(payload interface{}, ctx *gin.Context) error {
 		ctx.AbortWithStatusJSON(400, gin.H{"message": "Invalid JSON"})
 		return errors.New(err.Error())
 	}
-
 	// Check if the payload is a slice
 	v := reflect.ValueOf(payload).Elem()
 
@@ -25,14 +24,14 @@ func ValidationPayload(payload interface{}, ctx *gin.Context) error {
 			// Validate each item in the slice
 			item := v.Index(i)
 			if err := validate.Struct(item); err != nil {
-				ctx.AbortWithStatusJSON(400, gin.H{"message": "Not Validate Character", "error": err.Error()})
+				ctx.AbortWithStatusJSON(400, gin.H{"message": "Not Validate Character Slice", "error": err.Error()})
 				return errors.New(err.Error())
 			}
 		}
 	} else {
 		// Validate single object
 		if err := validate.Struct(payload); err != nil {
-			ctx.AbortWithStatusJSON(400, gin.H{"message": "Not Validate Character", "error": err.Error()})
+			ctx.AbortWithStatusJSON(400, gin.H{"message": "Not Validate Character Single", "error": err.Error()})
 			return errors.New(err.Error())
 		}
 	}

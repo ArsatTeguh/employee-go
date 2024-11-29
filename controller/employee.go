@@ -5,6 +5,7 @@ import (
 	"backend/helper"
 	"backend/models"
 	"fmt"
+	"os"
 	"strconv"
 
 	"strings"
@@ -24,6 +25,7 @@ type ServiceEmployee interface {
 	UploadProfile(ctx *gin.Context)
 	Update(ctx *gin.Context)
 	Delete(ctx *gin.Context)
+	GetProfile(ctx *gin.Context)
 }
 
 func NewServiceEmployee(db *gorm.DB) ServiceEmployee {
@@ -48,7 +50,7 @@ func (e *employeeController) GetAllEmployee(ctx *gin.Context) {
 	sizePage, _ := strconv.Atoi(ctx.DefaultQuery("sizePage", "5"))
 
 	offset := (page - 1) * sizePage
-	query := e.DB.Model(&emp).Preload("Wallet").Preload("Position").Preload("Position.Attedance")
+	query := e.DB.Model(&emp).Preload("Wallet").Preload("Position").Preload("Project").Preload("Project.Attedance")
 
 	if search != "" {
 		emailPattern := "%" + strings.ToLower(search) + "%"
@@ -72,7 +74,8 @@ func (e *employeeController) GetAllEmployee(ctx *gin.Context) {
 		Message: "Ok",
 		Data: map[string]any{
 			"employees":  emp,
-			"total":      totalCount,
+			"total":      len(emp),
+			"totalAll":   totalCount,
 			"page":       page,
 			"sizePage":   sizePage,
 			"totalPages": (totalCount + int64(sizePage) - 1) / int64(sizePage),
@@ -163,7 +166,7 @@ func (e *employeeController) Update(ctx *gin.Context) {
 		return
 	}
 
-	var body dto.CreatePayload
+	var body dto.UpdateEmployeeStruct
 	var employee models.Employee
 
 	if err := dto.ValidationPayload(&body, ctx); err != nil {
@@ -181,8 +184,8 @@ func (e *employeeController) Update(ctx *gin.Context) {
 		return
 	}
 
-	query := e.DB.Model(&employee).Where("id = ?", user.Id) // update many values
-	payload_em := body.PayloadEmployee()
+	query := e.DB.Model(&employee).Where("id = ?", user.Id).First(&employee) // update many values
+	payload_em := body.UpdateEmployee()
 	if err := query.Updates(&payload_em).Error; err != nil {
 		response := &helper.WithoutData{
 			Code:    400,
@@ -192,22 +195,10 @@ func (e *employeeController) Update(ctx *gin.Context) {
 		return
 	}
 
-	qw := e.DB.Model(&models.Wallet{}).Where("employee_id = ?", user.Id)
-	payload_wl := body.PayloadWallet(user.Id)
-
-	if err := qw.Updates(&payload_wl).Error; err != nil {
-		response := &helper.WithoutData{
-			Code:    500,
-			Message: err.Error(),
-		}
-
-		response.Response(ctx)
-		return
-	}
-
-	response := &helper.WithoutData{
+	response := &helper.WithData{
 		Code:    200,
 		Message: "Update Success",
+		Data:    employee,
 	}
 	response.Response(ctx)
 }
@@ -252,7 +243,6 @@ func (e *employeeController) UploadProfile(ctx *gin.Context) {
 			Code:    400,
 			Message: error.Error(),
 		}
-
 		response.Response(ctx)
 		return
 	}
@@ -267,6 +257,13 @@ func (e *employeeController) UploadProfile(ctx *gin.Context) {
 		return
 	}
 
+	query := e.DB.Model(&employee).Where("id = ?", user.Id).First(&employee)
+
+	if employee.Picture != "" {
+		// Implement file deletion logic here
+		os.Remove(employee.Picture)
+	}
+
 	urlStatic := "assets/" + file.Filename
 
 	if err := ctx.SaveUploadedFile(file, urlStatic); err != nil {
@@ -279,19 +276,37 @@ func (e *employeeController) UploadProfile(ctx *gin.Context) {
 		return
 	}
 
-	if err := e.DB.Model(&employee).Where("id = ?", user.Id).Update("picture", "/"+urlStatic).Error; err != nil {
+	if err := query.Update("picture", urlStatic).Error; err != nil {
 		response := &helper.WithoutData{
 			Code:    400,
 			Message: err.Error(),
 		}
-
 		response.Response(ctx)
 		return
 	}
 
-	response := &helper.WithoutData{
+	response := &helper.WithData{
 		Code:    200,
 		Message: "Upload Success",
+		Data:    employee.Picture,
+	}
+
+	response.Response(ctx)
+}
+
+func (e *employeeController) GetProfile(ctx *gin.Context) {
+	id := ctx.Param("id")
+	var employee models.Employee
+
+	if err := e.DB.Model(&employee).Where("id = ?", id).First(&employee).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	response := &helper.WithData{
+		Code:    200,
+		Message: "Success",
+		Data:    employee.Picture,
 	}
 
 	response.Response(ctx)

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <!--[if !mso]><!-->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <!--<![endif]-->
+    <title></title>
+    <style type="text/css">
+      .container {
+        padding: 2rem;
+      }
+      .header {
+        display: grid;
+        grid-template-columns: auto auto auto auto auto auto;
+        gap: 10px;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        line-height: 10px;
+      }
+      .item1 {
+  grid-column: 1 / 5;
+}
+      .header-text {
+        font-size: 40px;
+        font-weight: 600;
+      }
+      .text-lg {
+        font-size: 24px;
+      }
+      .text-md {
+        font-size: 16px;
+      }
+      .text-zinc {
+        color: rgb(116, 116, 116);
+      }
+      .form {
+        margin-top: 4rem;
+        padding-right: 2rem;
+        padding-left: 2rem;
+
+        display: flex;
+        border-style: solid;
+        border-width: 0px 0px 2px 0px;
+
+        border-color: rgb(49, 49, 49);
+        align-items: center;
+        justify-content: space-between;
+      }
+      .column {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-right: 2rem;
+        padding-left: 2rem;
+      }
+      .total {
+        border-style: solid;
+        border-width: 2px 0px 2px 0px;
+        font-weight: 800;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="">
+          <p class="text-lg">PT. LOREM</p>
+          <p class="text-zinc">JL. jalan-jalan No 100 Lorem ipsum dolor sit.</p>
+        </div>
+        <div class="header-sub">
+          <p class="header-text">PAYSLIP</p>
+          <p class="text-zinc text-md">No Payroll : #{{.Id}}</p>
+          <p class="text-zinc text-md">Date: {{.Date}}</p>
+        </div>
+      </div>
+      <div class="form">
+        <p class="text-md">Description</p>
+        <p class="text-md">Total</p>
+      </div>
+      <div class="column">
+        <p class="text-md">Absence</p>
+        <p class="text-md">{{.Absence}}</p>
+      </div>
+      <div class="column">
+        <p class="text-md">Tax</p>
+        <p class="text-md">{{.Tax}} %</p>
+      </div>
+      <div class="column">
+        <p class="text-md">Total Hour</p>
+        <p class="text-md">{{.Hour}} hour</p>
+      </div>
+      <div class="column">
+        <p class="text-md">Bonus</p>
+        <p class="text-md">Rp. {{.Bonus}}</p>
+      </div>
+      <div class="column">
+        <p class="text-md">Daily Salary</p>
+        <p class="text-md">Rp. {{.Daily}}</p>
+      </div>
+      <div class="column total">
+        <p class="text-md">Total</p>
+        <p class="text-md">Rp. {{.Total}}</p>
+      </div>
+    </div>
+  </body>
+</html>

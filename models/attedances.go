@@ -10,7 +10,7 @@ type Attedance struct {
 	Working_house float64    `json:"working_house" gorm:"size:50"`
 	EmployeeId    int64      `gorm:"index" json:"employee_id"`
 	ProjectId     int64      `gorm:"index" json:"project_id"`
-	PositionId    int64      `gorm:"index" json:"position_id"`
+	Project       Project    `json:"project"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 }

@@ -37,6 +37,7 @@ func ConnectionDb() {
 		&Attedance{},
 		&Payroll{},
 		&Leave{},
+		&Task{},
 	)
 	DB = database
 

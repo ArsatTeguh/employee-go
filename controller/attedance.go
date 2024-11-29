@@ -5,6 +5,7 @@ import (
 	"backend/helper"
 	"backend/models"
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -20,27 +21,58 @@ func (a *AttedanceController) GetAll(ctx *gin.Context) {
 	var attedance []models.Attedance
 	user, errs := helper.GetUser(ctx)
 
+	search := ctx.Query("date")
+
+	var totalCount int64
 	if errs != nil {
 		return
 	}
 	// open caching
 
-	if err := a.DB.Where("employee_id = ?", user.Id).Find(&attedance).Error; err != nil {
-		helper.ErrorServer(err, ctx)
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	sizePage, _ := strconv.Atoi((ctx.Copy().DefaultQuery("sizePage", "10")))
+	offset := (page - 1) * sizePage
+
+	query := a.DB.Model(&attedance).Preload("Project").Where("employee_id = ?", user.Id)
+
+	if matched, _ := regexp.MatchString(`^\d{4}-\d{2}$`, search); !matched {
+		response := &helper.WithoutData{
+			Code:    400,
+			Message: "invalid date format. Use YYYY-MM",
+		}
+		response.Response(ctx)
 		return
 	}
+
+	if search != "" {
+		query = query.Where("DATE_FORMAT(chekin, '%Y-%m') = ?", search)
+	}
+
+	query.Count(&totalCount)
+	query.Offset(offset).Limit(sizePage).Find(&attedance)
 
 	if len(attedance) == 0 {
-		ctx.AbortWithStatusJSON(400, map[string]string{"message": "Data not Found"})
+		response := &helper.WithoutData{
+			Code:    400,
+			Message: "Data empty",
+		}
+		response.Response(ctx)
 		return
 	}
 
-	res := helper.WithData{
+	response := &helper.WithData{
 		Code:    200,
 		Message: "Success Get Attedances",
-		Data:    attedance,
+		Data: map[string]any{
+			"attedances": attedance,                                            // data
+			"totalAll":   totalCount,                                           // total data all page
+			"total":      len(attedance),                                       // total data per page
+			"page":       page,                                                 // current page
+			"sizePage":   sizePage,                                             // maximum data per page
+			"totalPages": (totalCount + int64(sizePage) - 1) / int64(sizePage), // total all page
+		},
 	}
-	res.Response(ctx)
+	response.Response(ctx)
 }
 
 func (a *AttedanceController) GetOne(ctx *gin.Context) {
@@ -122,20 +154,11 @@ func (a *AttedanceController) Created(ctx *gin.Context) {
 
 }
 
-type AttedanceId struct {
-	Id int64 `json:"id" binding:"required"`
-}
-
 func (a *AttedanceController) Update(ctx *gin.Context) { // attedances id body
 
 	var chekout models.Attedance
-	var att AttedanceId
 
-	if err := dto.ValidationPayload(&att, ctx); err != nil {
-		return
-	}
-
-	if _, err := a.chekinExist(ctx, &chekout, att.Id); err != nil {
+	if _, err := a.chekinExist(ctx, &chekout); err != nil {
 		return
 	}
 
@@ -147,7 +170,7 @@ func (a *AttedanceController) Update(ctx *gin.Context) { // attedances id body
 	res.Response(ctx)
 }
 
-func (a *AttedanceController) chekinExist(ctx *gin.Context, chekout *models.Attedance, attId int64) (models.Attedance, error) {
+func (a *AttedanceController) chekinExist(ctx *gin.Context, chekout *models.Attedance) (models.Attedance, error) {
 	var employee models.Employee
 	user, err := helper.GetUser(ctx)
 
@@ -160,7 +183,7 @@ func (a *AttedanceController) chekinExist(ctx *gin.Context, chekout *models.Atte
 		return *chekout, fmt.Errorf(err.Error())
 	}
 
-	if err := a.DB.Where("id = ? AND chekout IS NULL", attId).First(&chekout).Error; err != nil { // attedance_id
+	if err := a.DB.Where("employee_id = ? AND chekout IS NULL", user.Id).First(&chekout).Error; err != nil { // userId
 		res := helper.WithoutData{
 			Code:    400,
 			Message: "Attedance tidak ditemukan atau user sudah checkout",
@@ -228,7 +251,7 @@ func (a *AttedanceController) EmployeeCheckout(ctx *gin.Context) { // body id em
 		return
 	}
 
-	if err := a.DB.Where("id = ? AND is_chekin = ?", body, 0).First(&employee).Error; err != nil {
+	if err := a.DB.Where("id = ? AND is_chekin = ?", body.Employee_id, 0).First(&employee).Error; err != nil {
 		helper.ErrorServer(err, ctx)
 		return
 	}

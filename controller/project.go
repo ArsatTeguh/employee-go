@@ -5,6 +5,7 @@ import (
 	"backend/helper"
 	"backend/models"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,19 +17,53 @@ type ProjectController struct {
 }
 
 func (p *ProjectController) GetAllProject(ctx *gin.Context) {
+	// valid := helper.Premission(ctx)
+
+	// if valid != nil {
+	// 	return
+	// }
+
 	var project []models.Project
+	search := ctx.Query("name")
+	var totalCount int64
+
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	sizePage, _ := strconv.Atoi((ctx.Copy().DefaultQuery("sizePage", "5")))
+	offset := (page - 1) * sizePage
+
 	query := p.DB.Model(&project).Preload("Position")
-	if err := query.Find(&project).Error; err != nil {
-		helper.ErrorServer(err, ctx)
+
+	// if query have some string and then
+	if search != "" {
+		namePattern := "%" + strings.ToLower(search) + "%"
+		query = query.Where("lower(name) LIKE ?", namePattern)
+	}
+
+	query.Count(&totalCount)
+	query.Offset(offset).Limit(sizePage).Find(&project)
+
+	if len(project) == 0 {
+		response := &helper.WithoutData{
+			Code:    400,
+			Message: "Data empty",
+		}
+		response.Response(ctx)
 		return
 	}
 
-	res := &helper.WithData{
+	response := &helper.WithData{
 		Code:    200,
-		Message: "Success Get All Project",
-		Data:    project,
+		Message: "Success Get Projects",
+		Data: map[string]any{
+			"projects":   project,                                              // data
+			"totalAll":   totalCount,                                           // total data all page
+			"total":      len(project),                                         // total data per page
+			"page":       page,                                                 // current page
+			"sizePage":   sizePage,                                             // maximum data per page
+			"totalPages": (totalCount + int64(sizePage) - 1) / int64(sizePage), // total all page
+		},
 	}
-	res.Response(ctx)
+	response.Response(ctx)
 }
 
 func (p *ProjectController) GetOne(ctx *gin.Context) {
@@ -36,7 +71,7 @@ func (p *ProjectController) GetOne(ctx *gin.Context) {
 
 	id := ctx.Param("id")
 
-	query := p.DB.Model(&project).Preload("Position")
+	query := p.DB.Model(&project).Preload("Attedance").Preload("Position")
 	if err := query.Where("id = ?", id).First(&project).Error; err != nil {
 		helper.ErrorServer(err, ctx)
 		return
@@ -54,6 +89,7 @@ func (p *ProjectController) Saved(ctx *gin.Context) {
 	if valid := helper.Premission(ctx); valid != nil {
 		return
 	}
+	user, _ := helper.GetUser(ctx)
 
 	var req dto.RequestProject
 
@@ -61,7 +97,7 @@ func (p *ProjectController) Saved(ctx *gin.Context) {
 		return
 	}
 
-	project := req.SaveProject(nil)
+	project := req.SaveProject(nil, user.Id)
 
 	if err := p.DB.Create(&project).Error; err != nil {
 		res := &helper.WithoutData{
@@ -84,7 +120,7 @@ func (p *ProjectController) Update(ctx *gin.Context) {
 	if valid := helper.Premission(ctx); valid != nil {
 		return
 	}
-
+	user, _ := helper.GetUser(ctx)
 	var project models.Project
 	var body dto.RequestProject
 	param := ctx.Param("id")
@@ -101,7 +137,7 @@ func (p *ProjectController) Update(ctx *gin.Context) {
 	}
 	timeUpdate := time.Now()
 
-	req := body.SaveProject(&timeUpdate)
+	req := body.SaveProject(&timeUpdate, user.Id)
 
 	qr := p.DB.Model(&project).Where("id = ?", id).First(&project)
 	if err := qr.Updates(&req).Error; err != nil {
@@ -138,7 +174,17 @@ func (p *ProjectController) Delete(ctx *gin.Context) {
 	}
 
 	// Update foreign key to nullify the dependency
-	if err := p.DB.Model(&models.Position{}).Where("project_id = ?", id).Update("project_id", nil).Error; err != nil {
+	if err := p.DB.Where("project_id = ?", id).Delete(&models.Position{}).Error; err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := p.DB.Where("project_id = ?", id).Delete(&models.Attedance{}).Error; err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := p.DB.Where("project_id = ?", id).Delete(&models.Task{}).Error; err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
@@ -170,6 +216,7 @@ type TypeNewEmployee struct {
 	Name    string `json:"name"`
 	Status  string `json:"status"`
 	Picture string `json:"picture"`
+	Email   string `json:"email"`
 }
 
 func (p *ProjectController) ProjectMaster(ctx *gin.Context) {
@@ -201,7 +248,7 @@ func (p *ProjectController) ProjectMaster(ctx *gin.Context) {
 		// jika terjadi error lanjutkan saja
 	}
 
-	if err := p.DB.Table("employees").Select("name", "status", "picture").Find(&employees).Error; err != nil {
+	if err := p.DB.Table("employees").Select("name", "status", "picture", "email").Find(&employees).Error; err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
 	}
 

@@ -4,7 +4,9 @@ import (
 	"backend/dto"
 	"backend/helper"
 	"backend/models"
-	"errors"
+	"io"
+	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -35,39 +37,26 @@ func (p *PayrollController) GetAll(ctx *gin.Context) {
 
 func (p *PayrollController) Payroll(ctx *gin.Context) {
 	var employee models.Employee
+	var attedance []models.Attedance
 	var req dto.RequestPayroll
 
-	if body := ctx.ShouldBind(&req); body != nil {
-		response := &helper.WithoutData{
-			Code:    400,
-			Message: body.Error(),
-		}
-		response.Response(ctx)
+	if err := dto.ValidationPayload(&req, ctx); err != nil {
 		return
 	}
 
-	query := p.DB.Model(&employee).Preload("Wallet").Preload("Position").Preload("Position.Attedance")
-	if err := query.Where("id = ?", req.EmployeeId).First(&employee).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response := &helper.WithoutData{
-				Code:    400,
-				Message: err.Error(),
-			}
-			response.Response(ctx)
-			return
-		}
-	}
-
-	if len(employee.Position) == 0 {
-		response := &helper.WithoutData{
-			Code:    400,
-			Message: "Data Position tidak ada",
-		}
-		response.Response(ctx)
+	if err := p.DB.Model(&employee).Preload("Wallet").Where("id = ?", req.EmployeeId).First(&employee).Error; err != nil {
+		helper.ErrorServer(err, ctx)
 		return
 	}
+
+	datePattern := "%" + strings.ToLower(req.Date) + "%"
+	if err := p.DB.Model(&attedance).Where("lower(chekin) LIKE ? AND employee_id = ?", datePattern, req.EmployeeId).Find(&attedance).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
 	salary_monthly := employee.Wallet.MonthlySalary
-	attedances := employee.Position[0].Attedance
+	attedances := attedance
 
 	result_payroll := req.CalculationPayroll(salary_monthly, attedances)
 
@@ -84,6 +73,48 @@ func (p *PayrollController) Payroll(ctx *gin.Context) {
 		Code:    201,
 		Message: "Payroll berhasil disimpan",
 		Data:    result_payroll,
+	}
+	response.Response(ctx)
+}
+
+func (p *PayrollController) EmailPayslip(ctx *gin.Context) {
+
+	file, err := ctx.FormFile("pdf")
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Failed to retrieve PDF file",
+		})
+		return
+	}
+
+	// Open the file
+	src, err := file.Open()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to open PDF file",
+		})
+		return
+	}
+	defer src.Close()
+
+	// Read file contents
+	fileBytes, err := io.ReadAll(src)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to read PDF file",
+		})
+		return
+	}
+
+	// Get date from form
+	date := ctx.PostForm("date")
+
+	// Use a channel for async processing if needed
+	go helper.SendPayslip(fileBytes, "arsatteguh@gmail.com", date)
+
+	response := &helper.WithoutData{
+		Code:    201,
+		Message: "Payroll berhasil dikirim",
 	}
 	response.Response(ctx)
 }
