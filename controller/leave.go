@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -68,21 +69,13 @@ func (l *LeaveController) GetAll(ctx *gin.Context) {
 
 func (l *LeaveController) Created(ctx *gin.Context) {
 	var body dto.RequestLeave
-
-	id := ctx.Param("id") // id of employee in request leave
-	no, _ := strconv.ParseInt(id, 10, 64)
-
-	employee, err := helper.EmployeeExist(no, l.DB)
-
-	if err != nil {
-		return
-	}
+	user, _ := helper.GetUser(ctx)
 
 	if err := dto.ValidationPayload(&body, ctx); err != nil {
 		return
 	}
 
-	res := body.SavePosition(employee.Id)
+	res := body.SavePosition(user.Id)
 
 	if err := l.DB.Create(&res).Error; err != nil {
 		response := &helper.WithoutData{
@@ -93,12 +86,20 @@ func (l *LeaveController) Created(ctx *gin.Context) {
 		return
 	}
 
-	go helper.SendEmail(employee)
+	data := helper.FormatEmailLeave{
+		LeaveType: res.LeaveType,
+		StartDate: body.StartDate,
+		EndDate:   body.EndDate,
+		Status:    res.Status,
+		Employee:  user.Email,
+	}
+
+	go helper.SendEmail(data)
 
 	response := &helper.WithData{
 		Code:    201,
 		Message: "Insert",
-		Data:    res,
+		Data:    body,
 	}
 	response.Response(ctx)
 }
@@ -116,8 +117,10 @@ func (l *LeaveController) Approve(ctx *gin.Context) {
 
 	var body BodyJson
 	var leave models.Leave
+
 	param := ctx.Param("id")
 	id, _ := strconv.Atoi(param)
+
 	if err := ctx.ShouldBindJSON(&body); err != nil {
 		response := &helper.WithoutData{
 			Code:    400,
@@ -127,7 +130,7 @@ func (l *LeaveController) Approve(ctx *gin.Context) {
 		return
 	}
 
-	if err := l.DB.Where("id = ? & employee_id = ?", id, body.EmployeeId).First(&leave).Error; err != nil {
+	if err := l.DB.Where("id = ? AND employee_id = ?", id, body.EmployeeId).First(&leave).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			response := &helper.WithoutData{
 				Code:    400,
@@ -163,29 +166,42 @@ func (l *LeaveController) Approve(ctx *gin.Context) {
 	response.Response(ctx)
 }
 
+type PayloadByIdEmployee struct {
+	EmployeeId int64 `json:"employee_id" binding:"required"`
+}
+
+type ResponseLeave struct {
+	Id         int64     `json:"id" `
+	EmployeeId int64     `json:"employee_id"`
+	LeaveType  string    `json:"leave_type"`
+	StartDate  time.Time `json:"start_date"`
+	EndDate    time.Time `json:"end_date"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 func (l *LeaveController) GetAllByEmployee(ctx *gin.Context) {
 
 	var leave []models.Leave
+	var result []ResponseLeave
+	param := ctx.Param("id")
 
-	user, err := helper.GetUser(ctx)
-
-	if err != nil {
+	if param == "" {
+		ctx.AbortWithStatusJSON(400, map[string]string{"message": "Param Required"})
 		return
 	}
 
-	if err := l.DB.Find(&leave, user.Id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response := &helper.WithoutData{
-				Code:    400,
-				Message: err.Error(),
-			}
-			response.Response(ctx)
-			return
-		}
+	id, _ := strconv.ParseInt(param, 10, 64)
 
+	if err := l.DB.Model(&leave).Where("employee_id = ?", id).Find(&result).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	if len(result) == 0 {
 		response := &helper.WithoutData{
-			Code:    500,
-			Message: err.Error(),
+			Code:    400,
+			Message: "Data Not Found",
 		}
 		response.Response(ctx)
 		return
@@ -194,41 +210,59 @@ func (l *LeaveController) GetAllByEmployee(ctx *gin.Context) {
 	response := &helper.WithData{
 		Code:    200,
 		Message: "success",
-		Data:    leave,
+		Data:    result,
 	}
 	response.Response(ctx)
 }
 
 func (l *LeaveController) GetOneByEmployee(ctx *gin.Context) {
-	var leave models.Leave
-
+	var leave []models.Leave
+	var res []ResponseLeave
 	user, err := helper.GetUser(ctx)
 
 	if err != nil {
 		return
 	}
 
-	if err := l.DB.First(&leave, user.Id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response := &helper.WithoutData{
-				Code:    400,
-				Message: err.Error(),
-			}
-			response.Response(ctx)
-			return
-		}
+	if err := l.DB.Model(&leave).Where("employee_id = ? ", user.Id).Find(&res).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	if len(res) == 0 {
 		response := &helper.WithoutData{
-			Code:    500,
-			Message: err.Error(),
+			Code:    400,
+			Message: "Data Not Found",
 		}
 		response.Response(ctx)
 		return
 	}
-
 	response := &helper.WithData{
 		Code:    200,
 		Message: "success",
-		Data:    leave,
+		Data:    res,
+	}
+	response.Response(ctx)
+}
+
+func (l *LeaveController) Delete(ctx *gin.Context) {
+	err := helper.Premission(ctx)
+	if err != nil {
+		return
+	}
+
+	var leave models.Leave
+	param := ctx.Param("id") // leave id
+	id, _ := strconv.Atoi(param)
+
+	if err := l.DB.Delete(&leave, id).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	response := &helper.WithoutData{
+		Code:    200,
+		Message: "success",
 	}
 	response.Response(ctx)
 }

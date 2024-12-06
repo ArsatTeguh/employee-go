@@ -16,6 +16,32 @@ type ProjectController struct {
 	DB *gorm.DB
 }
 
+type TypepopupProject struct {
+	Name       string `json:"name" `
+	Id         int64  `json:"id" `
+	Status     string `json:"status" `
+	Estimation string `json:"Estimation" `
+}
+
+func (p *ProjectController) PopupProject(ctx *gin.Context) {
+	var projects models.Project
+
+	result := []TypepopupProject{}
+
+	if err := p.DB.Model(&projects).Select("id", "name", "status", "estimation").Find(&result).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	response := &helper.WithData{
+		Code:    200,
+		Message: " Success",
+		Data:    result,
+	}
+	response.Response(ctx)
+
+}
+
 func (p *ProjectController) GetAllProject(ctx *gin.Context) {
 	// valid := helper.Premission(ctx)
 
@@ -158,7 +184,6 @@ func (p *ProjectController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	var project models.Project
 	param := ctx.Param("id")
 
 	if param == "" {
@@ -168,29 +193,8 @@ func (p *ProjectController) Delete(ctx *gin.Context) {
 
 	id, _ := strconv.ParseInt(param, 10, 64)
 
-	if err := p.DB.Where("id = ?", id).First(&project).Error; err != nil {
-		helper.ErrorServer(err, ctx)
-		return
-	}
-
-	// Update foreign key to nullify the dependency
-	if err := p.DB.Where("project_id = ?", id).Delete(&models.Position{}).Error; err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := p.DB.Where("project_id = ?", id).Delete(&models.Attedance{}).Error; err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := p.DB.Where("project_id = ?", id).Delete(&models.Task{}).Error; err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := p.DB.Delete(&project, id).Error; err != nil {
-		helper.ErrorServer(err, ctx)
+	if err := helper.AssosiationProject(id, ctx, p.DB); err != nil {
+		ctx.AbortWithStatusJSON(400, map[string]string{"message": "Failed delete association", "error": err.Error()})
 		return
 	}
 

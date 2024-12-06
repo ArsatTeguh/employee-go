@@ -33,14 +33,16 @@ func SetupRouter(server *gin.Engine, databases *gorm.DB) *gin.Engine {
 
 	protected.GET("/auth/user-one", user.GetOneUser)
 	protected.GET("/auth/user", user.GetAll)
+	protected.PATCH("/auth/user/:id", user.Update)
 	protected.POST("/auth/logout", user.Logout)
 
 	protected.GET("/employees", employee.GetAllEmployee)
+	protected.GET("/employee-popup", employee.PopupEmployee)
 	protected.GET("/employee-one", employee.GetOneEmployee)
 	protected.POST("/employee", employee.SaveEmployee)
 	protected.PATCH("/upload", employee.UploadProfile)
 	protected.PATCH("/employee", employee.Update)
-	protected.DELETE("/employee", employee.Delete)
+	protected.DELETE("/employee-delete/:id", employee.Delete)
 	protected.GET("/profile/:id", employee.GetProfile)
 
 	protected.GET("/positions", position.GetAllPosition)
@@ -52,6 +54,7 @@ func SetupRouter(server *gin.Engine, databases *gorm.DB) *gin.Engine {
 	protected.PATCH("/positions", position.SyncPositions)
 
 	protected.GET("/projects", project.GetAllProject)
+	protected.GET("/project-popup", project.PopupProject)
 	protected.GET("/project/:id", project.GetOne)
 	protected.POST("/project", project.Saved)
 	protected.PATCH("/project/:id", project.Update)
@@ -67,12 +70,14 @@ func SetupRouter(server *gin.Engine, databases *gorm.DB) *gin.Engine {
 	protected.GET("/payrolls", payroll.GetAll)
 	protected.POST("/payroll", payroll.Payroll)
 	protected.POST("/payroll-email", payroll.EmailPayslip)
+	protected.POST("/payroll-excel", payroll.ExportExcelHandler)
 
 	protected.GET("/leaves", leave.GetAll)
-	protected.GET("/leaves-employee", leave.GetAllByEmployee)
+	protected.GET("/leaves-employee/:id", leave.GetAllByEmployee)
 	protected.GET("/leave-employee", leave.GetOneByEmployee)
-	protected.POST("/leave/:id", leave.Created)
+	protected.POST("/leave", leave.Created)
 	protected.PATCH("/leave/:id", leave.Approve)
+	protected.DELETE("/leave/:id", leave.Delete)
 
 	protected.PATCH("/task/:id", task.Update)
 	protected.GET("/task/:projectId", task.GetOne)

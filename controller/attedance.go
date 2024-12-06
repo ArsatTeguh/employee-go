@@ -76,27 +76,68 @@ func (a *AttedanceController) GetAll(ctx *gin.Context) {
 }
 
 func (a *AttedanceController) GetOne(ctx *gin.Context) {
-	var attedance models.Attedance
-	param := ctx.Param("id") // employee id
-	id, _ := strconv.Atoi(param)
-	validate := helper.Premission(ctx)
+	var attedance []models.Attedance
 
-	if validate != nil {
+	param := ctx.Param("id")
+
+	if param == "" {
+		ctx.AbortWithStatusJSON(400, map[string]string{"message": "Required Params"})
 		return
 	}
 
-	if err := a.DB.Where("employee_id = ?", id).Find(&attedance).Error; err != nil {
-		helper.ErrorServer(err, ctx)
+	id, _ := strconv.ParseInt(param, 10, 64)
+
+	search := ctx.Query("date")
+
+	var totalCount int64
+
+	// open caching
+
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	sizePage, _ := strconv.Atoi((ctx.Copy().DefaultQuery("sizePage", "10")))
+	offset := (page - 1) * sizePage
+
+	query := a.DB.Model(&attedance).Preload("Project").Where("employee_id = ?", id)
+
+	if matched, _ := regexp.MatchString(`^\d{4}-\d{2}$`, search); !matched {
+		response := &helper.WithoutData{
+			Code:    400,
+			Message: "invalid date format. Use YYYY-MM",
+		}
+		response.Response(ctx)
 		return
 	}
 
-	res := helper.WithData{
+	if search != "" {
+		query = query.Where("DATE_FORMAT(chekin, '%Y-%m') = ?", search)
+	}
+
+	query.Count(&totalCount)
+	query.Offset(offset).Limit(sizePage).Find(&attedance)
+	hoursMonth := helper.CalculationWorkMonthly(attedance)
+	if len(attedance) == 0 {
+		response := &helper.WithoutData{
+			Code:    400,
+			Message: "Data empty",
+		}
+		response.Response(ctx)
+		return
+	}
+
+	response := &helper.WithData{
 		Code:    200,
-		Message: "Success get one Attedances",
-		Data:    attedance,
+		Message: "Success Get Attedances",
+		Data: map[string]any{
+			"attedances": attedance,                                            // data
+			"totalAll":   totalCount,                                           // total data all page
+			"total":      len(attedance),                                       // total data per page
+			"page":       page,                                                 // current page
+			"sizePage":   sizePage,                                             // maximum data per page
+			"totalPages": (totalCount + int64(sizePage) - 1) / int64(sizePage), // total all page
+			"hoursMonth": hoursMonth,
+		},
 	}
-	res.Response(ctx)
-
+	response.Response(ctx)
 }
 
 func (a *AttedanceController) Created(ctx *gin.Context) {

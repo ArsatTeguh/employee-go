@@ -5,6 +5,7 @@ import (
 	"backend/helper"
 	"backend/models"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,7 @@ type userServcie interface {
 	GetOneUser(ctx *gin.Context)
 	GetAll(ctx *gin.Context)
 	RefreshToken(ctx *gin.Context)
+	Update(ctx *gin.Context)
 }
 
 func NewUserService(db *gorm.DB) userServcie {
@@ -74,6 +76,8 @@ func (u *User) Register(ctx *gin.Context) {
 	if err := dto.ValidationPayload(&payload, ctx); err != nil {
 		return
 	}
+
+	oldPassword := payload.Password
 
 	if payload.Password != payload.RepeatPassword {
 		response := &helper.WithoutData{
@@ -144,6 +148,14 @@ func (u *User) Register(ctx *gin.Context) {
 		response.Response(ctx)
 		return
 	}
+
+	data := helper.BodyRegister{
+		Email:    payload.Email,
+		Password: oldPassword,
+		Name:     payload.Name,
+	}
+
+	go helper.SendEmailRegister(data)
 
 	response := &helper.WithData{
 		Code:    201,
@@ -326,6 +338,53 @@ func (u *User) RefreshToken(ctx *gin.Context) {
 		Code:    200,
 		Message: "success",
 		Data:    newToken,
+	}
+
+	response.Response(ctx)
+}
+
+type UpdateUser struct {
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+func (u *User) Update(ctx *gin.Context) {
+	validate := helper.Premission(ctx)
+
+	if validate != nil {
+		return
+	}
+
+	var user models.User
+	var payload UpdateUser
+
+	param := ctx.Param("id")
+
+	if param == "" {
+		ctx.AbortWithStatusJSON(400, map[string]string{"message": "Required params"})
+		return
+	}
+
+	id, _ := strconv.ParseInt(param, 10, 64)
+
+	if err := dto.ValidationPayload(&payload, ctx); err != nil {
+		return
+	}
+
+	if err := u.DB.Model(&user).Where("id = ?", id).First(&user).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	if err := u.DB.Model(&user).Updates(payload).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	response := &helper.WithData{
+		Code:    200,
+		Message: "success",
+		Data:    user,
 	}
 
 	response.Response(ctx)

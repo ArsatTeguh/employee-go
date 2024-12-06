@@ -2,6 +2,7 @@ package dto
 
 import (
 	"errors"
+	"net/http"
 	"reflect"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +14,10 @@ func ValidationPayload(payload interface{}, ctx *gin.Context) error {
 
 	// Bind the incoming JSON to the payload
 	if err := ctx.ShouldBindJSON(&payload); err != nil {
-		ctx.AbortWithStatusJSON(400, gin.H{"message": "Invalid JSON"})
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid JSON",
+			"message": err.Error(),
+		})
 		return errors.New(err.Error())
 	}
 	// Check if the payload is a slice
@@ -24,14 +28,20 @@ func ValidationPayload(payload interface{}, ctx *gin.Context) error {
 			// Validate each item in the slice
 			item := v.Index(i)
 			if err := validate.Struct(item); err != nil {
-				ctx.AbortWithStatusJSON(400, gin.H{"message": "Not Validate Character Slice", "error": err.Error()})
+				ctx.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Not Validate Character",
+					"message": err.Error(),
+				})
 				return errors.New(err.Error())
 			}
 		}
 	} else {
 		// Validate single object
 		if err := validate.Struct(payload); err != nil {
-			ctx.AbortWithStatusJSON(400, gin.H{"message": "Not Validate Character Single", "error": err.Error()})
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Not Validate Character",
+				"message": err.Error(),
+			})
 			return errors.New(err.Error())
 		}
 	}

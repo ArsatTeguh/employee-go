@@ -17,6 +17,13 @@ type TaskController struct {
 
 func (t *TaskController) GetOne(ctx *gin.Context) {
 	var task []models.Task
+	var position []models.Position
+
+	user, errors := helper.GetUser(ctx)
+
+	if errors != nil {
+		return
+	}
 
 	param := ctx.Param("projectId")
 
@@ -26,6 +33,17 @@ func (t *TaskController) GetOne(ctx *gin.Context) {
 	}
 
 	id, _ := strconv.ParseInt(param, 10, 64)
+
+	t.DB.Where("employee_id = ? && project_id = ?", user.Id, id).First(&position)
+
+	if len(position) == 0 && user.Role != "hr" {
+		res := &helper.WithoutData{
+			Code:    400,
+			Message: "Akses tidak diizinkan",
+		}
+		res.Response(ctx)
+		return
+	}
 
 	if err := t.DB.Preload("Employee").Preload("Project").
 		Where("project_id = ?", id).Find(&task).Error; err != nil {

@@ -16,78 +16,37 @@
   <title></title>
   
     <style type="text/css">
-       .responsive-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 20px 0;
-    }
+   
     .paragraf {
     font-size: 14px;
     line-height: 50%;
   }
-    .responsive-table th {
-      font-size: 12px;
-      padding: 12px 15px;
-      text-align: left;
-      border: 1px solid #ddd;
-    }
+  
+   
+  .data {
+        color: white;
+        display: flex;
+        padding: 1rem .5rem 1rem .5rem;
+        font-size: 11px;
+      }
 
-    .responsive-table td {
-      font-size: 12px;
-      padding: 12px 15px;
-      text-align: left;
-      border: 1px solid #bbb;
-      color: white;
-    }
+      .data-sub {    
+        width: 100%;
+      }
 
-    .responsive-table th {
-      background-color: #f2f2f2;
-      font-weight: bold;
-    }
+      .data-sub p {
+        padding: 5px 0px 5px 0px ;
+      }
+  
 
     @media (max-width: 768px) {
-      .responsive-table,
-      .responsive-table thead,
-      .responsive-table tbody,
-      
-      .responsive-table td,
-      .responsive-table tr {
-        display: block;
-        text-align: start;
-        
-      }
+    
       .paragraf  {
     font-size: 11px !important;
     line-height: 20% ;
   }
-      .responsive-table td,
-      .responsive-table th
-      
-      {
-        font-size: 10px;
-        padding: 5px 0px;
-        text-align: left !important;
-      }
-      .responsive-table th {
-        display: none !important;
-      }
-      .responsive-table tr {
-        margin-bottom: 15px;
-      }
+     
 
-      .responsive-table td {
-        text-align: right;
-        padding-left: 20%;
-        position: relative;
-      }
-
-      .responsive-table td::before {
-        content: attr(data-label);
-        position: absolute;
-        left: 10px;
-        font-weight: bold;
-        text-align: left;
-      }
     }
       @media only screen and (min-width: 620px) {
   .u-row {
@@ -228,31 +187,31 @@ table, td { color: #000000; } #u_body a { color: #f1c40f; text-decoration: under
       <td class="v-container-padding-padding" style="overflow-wrap:break-word;word-break:break-word;padding:60px 50px 33px;font-family:'Raleway',sans-serif;" align="left">
         
   <div class="v-text-align" style="font-size: 14px; color: #ffffff; line-height: 140%; text-align: justify; word-wrap: break-word;">
-    <p style="line-height: 140%; font-size: 14px;"><span style="font-family: Raleway, sans-serif; font-size: 16px; line-height: 22.4px;"><strong>Dear {{.Name}}</strong></span></p>
+    <!-- <p style="line-height: 140%; font-size: 14px;"><span style="font-family: Raleway, sans-serif; font-size: 16px; line-height: 22.4px;"><strong>Dear {{.Name}}</strong></span></p> -->
 <!-- <p style="line-height: 140%; font-size: 14px;"> </p> -->
 <p style="line-height: 140%; font-size: 14px;"> </p>
-<p><span class="paragraf" style="font-family: Raleway, sans-serif; line-height: 19.6px;">Kamu telah mengajukan Cuti {{.Cuti}} dengan detail :</span></p>
+<p><span class="paragraf" style="font-family: Raleway, sans-serif; line-height: 19.6px;">Kamu telah mengajukan {{.Cuti}} dengan detail :</span></p>
 
-<table class="responsive-table">
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Jenis Cuti</th>
-      <th>Mulai</th>
-      <th>Berakhir</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td data-label="Name">{{.Name}}</td>
-      <td data-label="Jenis Cuti">{{.Cuti}}</td>
-      <td data-label="Mulai">{{.Start}}</td>
-      <td data-label="Berakhir">{{.End}}</td>
-      <td data-label="Status">{{.Status}}</td>
-    </tr>
-  </tbody>
-</table>
+<div class="data">
+  <div class="data-sub">
+  
+      <p>Email</p>
+      <p>Jenis Cuti</p>
+      <p>Mulai</p>
+      <p>Berakhir</p>
+      <p>Status</p>
+   
+  </div>
+  <div class="data-sub">
+   
+      <p>{{.Name}}</p>
+      <p>{{.Cuti}}</p>
+      <p >{{.Start}}</p>
+      <p >{{.End}}</p>
+      <p >{{.Status}}</p>
+   
+  </div>
+</div>
 
 <p class="paragraf"><span class="paragraf" style="font-family: Raleway, sans-serif; line-height: 19.6px;">
   Bedasarkan peraturan Perusahaan kamu perlu menunggu konfirmasi persetujuan terkait izin Cuti, Mohon untuk menunggu dalam waktu 1 x 24 jam. Terimkasih  </span></p>

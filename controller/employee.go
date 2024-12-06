@@ -26,12 +26,43 @@ type ServiceEmployee interface {
 	Update(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 	GetProfile(ctx *gin.Context)
+	PopupEmployee(ctx *gin.Context)
 }
 
 func NewServiceEmployee(db *gorm.DB) ServiceEmployee {
 	return &employeeController{
 		DB: db,
 	}
+}
+
+type popup struct {
+	Name   string `json:"name" `
+	Id     int64  `json:"id" `
+	Status string `json:"status" `
+}
+
+func (e *employeeController) PopupEmployee(ctx *gin.Context) {
+	valid := helper.Premission(ctx)
+
+	if valid != nil {
+		return
+	}
+	var employee models.Employee
+
+	result := []popup{}
+
+	if err := e.DB.Model(&employee).Select("id", "name", "status").Find(&result).Error; err != nil {
+		helper.ErrorServer(err, ctx)
+		return
+	}
+
+	response := &helper.WithData{
+		Code:    200,
+		Message: " Success",
+		Data:    result,
+	}
+	response.Response(ctx)
+
 }
 
 func (e *employeeController) GetAllEmployee(ctx *gin.Context) {
@@ -204,30 +235,37 @@ func (e *employeeController) Update(ctx *gin.Context) {
 }
 
 func (e *employeeController) Delete(ctx *gin.Context) {
+	// Check permissions
 	if valid := helper.Premission(ctx); valid != nil {
 		return
 	}
 
-	var employee models.Employee
-	var user models.User
 	param := ctx.Param("id")
-	id, _ := strconv.Atoi(param)
 
-	if err := e.DB.Delete(&employee, id).Error; err != nil {
+	if param == "" {
+		ctx.AbortWithStatusJSON(400, map[string]string{"message": "Param Required"})
+		return
+	}
+
+	id, _ := strconv.ParseInt(param, 10, 64)
+
+	var user models.User
+
+	if err := helper.AssociationEmploee(id, ctx, e.DB); err != nil {
+		ctx.AbortWithStatusJSON(400, map[string]string{"message": "Failed delete association", "error": err.Error()})
+		return
+	}
+
+	if err := e.DB.Delete(&user, id).Error; err != nil {
 		helper.ErrorServer(err, ctx)
 		return
 	}
 
-	if err := e.DB.Delete(&user, employee.Id).Error; err != nil {
-		helper.ErrorServer(err, ctx)
-		return
-	}
-
+	// Respond with success
 	response := &helper.WithoutData{
 		Code:    200,
 		Message: "Delete Success",
 	}
-
 	response.Response(ctx)
 }
 

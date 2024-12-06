@@ -8,24 +8,21 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
-type FormatEmailLeave struct {
-	LeaveType string
-	StartDate string
-	EndDate   string
-	Status    *string
-	Employee  string
+type BodyRegister struct {
+	Email    string
+	Password string
+	Name     string
 }
 
-// duog cufu wpty cezi
-func SendEmail(leave FormatEmailLeave) {
+func SendEmailRegister(user BodyRegister) {
 	m := gomail.NewMessage()
 	m.SetHeader("From", "arsyatteguh@gmail.com")
 	m.SetHeader("To", "arsatteguh@gmail.com")
 	// m.SetAddressHeader("Cc", "dan@example.com", "Dan")
 
 	// get HTML
-	var filepath = path.Join("HTML", "index.html")
-	t := TemplateEmail(filepath, leave)
+	var filepath = path.Join("HTML", "register.html")
+	t := TemplateEmailRegister(filepath, user)
 
 	m.SetHeader("Subject", "PT. Lorem")
 	m.SetBody("text/html", t.String())
@@ -39,8 +36,7 @@ func SendEmail(leave FormatEmailLeave) {
 	}
 }
 
-func TemplateEmail(url string, leave FormatEmailLeave) *bytes.Buffer {
-
+func TemplateEmailRegister(url string, user BodyRegister) *bytes.Buffer {
 	body := new(bytes.Buffer)
 	t, err := template.ParseFiles(url)
 	if err != nil {
@@ -48,11 +44,8 @@ func TemplateEmail(url string, leave FormatEmailLeave) *bytes.Buffer {
 	}
 
 	var data = map[string]interface{}{
-		"Name":   leave.Employee,
-		"Cuti":   leave.LeaveType,
-		"Start":  leave.StartDate,
-		"End":    leave.EndDate,
-		"Status": leave.Status,
+		"Email":    user.Email,
+		"Password": user.Password,
 	}
 
 	t.Execute(body, data)
